@@ -64,7 +64,7 @@ endif(EXISTS /usr/src/gtest)
 # Si vous utilisé plusieurs fichiers, en plus de mem.c, pour votre
 # allocateur il faut les ajouter ici
 ##
-add_library(allocphy SHARED src/mem.c)
+add_library(allocphy SHARED src/mem.c src/listBloc.c)
 
 ##
 # Construction du programme de tests unitaires
