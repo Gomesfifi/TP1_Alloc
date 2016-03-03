@@ -1,0 +1,24 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/src/mem.c
+stdio.h
+-
+stdlib.h
+-
+assert.h
+-
+mem.h
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/src/mem.h
+
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/src/mem.h
+variante.h
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/src/variante.h
+
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/src/variante.h
+

@@ -1,0 +1,4 @@
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/build/CMakeFiles/allocphy.dir
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/build/CMakeFiles/alloctest.dir
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/build/CMakeFiles/check.dir
+/user/1/.base/gomesf/home/Cours_2A/SEPC/ensimag-allocateur/build/CMakeFiles/memshell.dir
