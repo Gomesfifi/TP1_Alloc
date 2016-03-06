@@ -6,15 +6,21 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "mem.h"
-#include "listBloc.h"
 
 /** squelette du TP allocateur memoire */
 
 void *zone_memoire = 0;
 
 // Table Zones Libres
-listbloc TZL[BUDDY_MAX_INDEX+1];
+// uint64_t pour ne pas avoir de problèmes entre machine 32 ou 64 bits
+// et pour pouvoir déférencer (récupérer les adresses nécessaires )
+// Initialisation à NULL
+uint64_t* TZL[BUDDY_MAX_INDEX+1]={NULL};
+
+// mem_init doit avoir été effectuée pour utiliser les fonctions mem_alloc, mem_free, mem_destroy
+bool memEstInit = false;
 
 int
 mem_init()
@@ -23,24 +29,17 @@ mem_init()
         zone_memoire = (void *) malloc(ALLOC_MEM_SIZE);
     if (zone_memoire == 0)
     {
-        perror("mem_init:");
+        perror("mem_init: la zone mémoire n'est pas disponible");
         return -1;
     }
 
     // Initialisation de TZL
-    for (int i = 0; i < BUDDY_MAX_INDEX ; i++){
-        TZL[i].nombreBloc = 0;
-        TZL[i].premier = 0;
-        TZL[i].dernier = 0;
-    }
-    TZL[BUDDY_MAX_INDEX].nombreBloc = 1;
-    TZL[BUDDY_MAX_INDEX].premier = malloc(sizeof(bloc));
-    TZL[BUDDY_MAX_INDEX].premier->debutMemoire = zone_memoire;
-    TZL[BUDDY_MAX_INDEX].premier->estLibre = true;
-    TZL[BUDDY_MAX_INDEX].premier->suiv = 0;
-    // On ne depasse pas la taille maximale (2^20)
-    TZL[BUDDY_MAX_INDEX].premier->taille = 1 << BUDDY_MAX_INDEX;
-    TZL[BUDDY_MAX_INDEX].dernier = TZL[BUDDY_MAX_INDEX].premier;
+    // La zone mémoire est entièrement contenu à la taille 2^BUDDY_MAX_INDEX
+    TZL[BUDDY_MAX_INDEX] = (uint64_t *)zone_memoire;
+    // Il n'y a pas de bloc suivant
+    *TZL[BUDDY_MAX_INDEX] = 0;
+
+    memEstInit = true;
 
     return 0;
 }
@@ -48,7 +47,11 @@ mem_init()
 void *
 mem_alloc(unsigned long size)
 {
-    /*  ecrire votre code ici */
+    if (!memEstInit){
+        perror("La mémoire doit être initialisé avant un mem_alloc");
+        return NULL;
+    }
+
     return 0;
 }
 
@@ -63,20 +66,6 @@ mem_free(void *ptr, unsigned long size)
 int
 mem_destroy()
 {
-    // Libération de chaque listBloc
-    for (int i = 0; i <= BUDDY_MAX_INDEX; i++){
-        // Libération de tous les blocs de taille i
-        bloc* cour = TZL[i].premier;
-        bloc* next;
-        while (cour != 0){
-            next = cour->suiv;
-            free(cour);
-            cour = next;
-        }
-        TZL[i].premier = 0;
-        TZL[i].dernier = 0;
-        TZL[i].nombreBloc = 0;
-    }
     free(zone_memoire);
     zone_memoire = 0;
     return 0;
