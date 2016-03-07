@@ -16,7 +16,7 @@
 
 /**Maccros*/
 #define EST_DANS_ZONE_MEM(ptr) \
-  ((uint64_t) ptr) >= ((uint64_t) zone_memoire)) \
+  (((uint64_t) ptr) >= ((uint64_t) zone_memoire)) \
     && ((uint64_t) ptr) < (uint64_t) ((uint64_t) zone_memoire + ALLOC_MEM_SIZE)
 
 #define ADRESSE_BUDDY(ptr, index) \
@@ -26,7 +26,10 @@
 uint8_t getIndex(unsigned long size);
 uint8_t getFirstFree(uint8_t S);
 void * diviser(uint8_t S, uint8_t Slibre);
-int fusionner(uint64_t *ptr, uint64_t *buddy, uint8_t indice);
+void fusionner(uint64_t *ptr, uint8_t indice);
+bool estLibre(uint64_t *buddy, uint8_t indice);
+void supprimer(uint64_t *buddy, uint8_t indice);
+
 /**Variables nécessaires*/
 void *zone_memoire = 0;
 
@@ -94,35 +97,33 @@ mem_alloc(unsigned long size)
 }
 
 int
-mem_free(void *ptr, unsigned long size)
-{
-  // Erreur: libération non autorisée
-  if (!(EST_DANS_ZONE_MEM(ptr))) {
-    perror("Mem_free: La zone à libérer n'appartient pas à la zone mémoire initialement allouée");
-    return -1;
-  }
-  // Dépassement de la zone mémoire
-  if (size > ALLOC_MEM_SIZE ) {
-    perror("Mem_free: La zone à libérer est plus grande que la zone mémoire initialement allouée");
-    return -1;
-  }
-  
-  // Taille minimale à respecter pour un mem_free
-  if (size < sizeof(uint64_t *)) 
-    size = sizeof(uint64_t*);
-  
-  //Taille maximale
-  if (size == ALLOC_MEM_SIZE) {
-    TZL[BUDDY_MAX_INDEX] = (uint64_t *) ptr;
+mem_free(void *ptr, unsigned long size) {
+    // Erreur: libération non autorisée
+    if (!(EST_DANS_ZONE_MEM(ptr))) {
+        perror("Mem_free: La zone à libérer n'appartient pas à la zone mémoire initialement allouée");
+        return -1;
+    }
+    // Dépassement de la zone mémoire
+    if (size > ALLOC_MEM_SIZE) {
+        perror("Mem_free: La zone à libérer est plus grande que la zone mémoire initialement allouée");
+        return -1;
+    }
+
+    // Taille minimale à respecter pour un mem_free
+    if (size < sizeof(uint64_t *))
+        size = sizeof(uint64_t *);
+
+    //Taille maximale : Cas trivial
+    if (size == ALLOC_MEM_SIZE) {
+        TZL[BUDDY_MAX_INDEX] = (uint64_t *) ptr;
+        return 0;
+    }
+
+    //Récupération de l'adresse du budy:
+    uint64_t buddy = ADRESSE_BUDDY(ptr, getIndex(size));
+    fusionner((uint64_t*) ptr, getIndex(size));
+
     return 0;
-  }
-  
-  //Récupération de l'adresse du budy:
-  uint64_t buddy = ADRESSE_BUDY(ptr, getIndex(size));
-  
-  if (fusionner((uint64 *) ptr,(uint64 *) buddy, getIndex(size)) == -1) {
-    perror("Mem_free: "
-  return 0;
 }
 
 
@@ -186,7 +187,44 @@ void * diviser(uint8_t S, uint8_t Slibre){
 }
 
 
-int fusionner(uint64_t *ptr, uint64_t *buddy, uint8_t indice) {
-  //Cas d'arrêt de la récursion : l'indice est trop grand
-  if (indice == BUDDY_MAX_INDEX || buddy == 0) {
-    return -1;
+void fusionner(uint64_t *ptr, uint8_t indice) {
+    // Etape 0 : Calcul du buddy
+    uint64_t * buddy = (uint64_t *)(ADRESSE_BUDDY(ptr,indice));
+    // Etape 1 : Le buddy est-il dans la TZL[indice]
+    // Cas où il n'est pas dans la TZL
+    if (!estLibre(buddy,indice)){
+        *ptr = (uint64_t )TZL[indice];
+        TZL[indice] = ptr;
+        return;
+    }
+    // Etape 2 : Le buddy est dans la TZL
+    // Etape 2.1) On le supprime de la liste
+    supprimer(buddy,indice);
+    // Etape 2.2) On prend l'adresse de debut de bloc
+    uint64_t * adresse = ((uint64_t)ptr > (uint64_t)buddy) ? buddy : ptr;
+    // Etape 2.3) On fusionne les blocs supérieurs si nécessaire
+    fusionner(adresse,(uint8_t )(indice+1));
+}
+
+void supprimer(uint64_t *buddy, uint8_t indice) {
+    uint64_t * cour = TZL[indice];
+    // Cas où buddy est en tête
+    if (cour == buddy)
+        TZL[indice] = (uint64_t *)*buddy;
+    // Sinon recherche du buddy
+    while ((uint64_t *)*cour != buddy)
+        cour = (uint64_t *)*cour;
+    // cour est le prédécesseur de buddy
+    // On supprime buddy en le sautant dans le chainage
+    *cour = *buddy;
+}
+
+bool estLibre(uint64_t *buddy, uint8_t indice) {
+    uint64_t * cour = TZL[indice];
+    while (cour != (uint64_t*)0){
+        if (cour == buddy)
+            return true;
+        cour = (uint64_t *)(*cour);
+    }
+    return false;
+}
