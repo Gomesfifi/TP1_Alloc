@@ -15,10 +15,18 @@
 /** squelette du TP allocateur memoire */
 
 /**Maccros*/
+#define EST_DANS_ZONE_MEM(ptr) \
+  ((uint64_t) ptr) >= ((uint64_t) zone_memoire)) \
+    && ((uint64_t) ptr) < (uint64_t) ((uint64_t) zone_memoire + ALLOC_MEM_SIZE)
+
+#define ADRESSE_BUDDY(ptr, index) \
+  ((uint64_t) ptr)^((uint64_t) (1 << index)) 
+
 /**Fonctions intermédiaires*/
 uint8_t getIndex(unsigned long size);
 uint8_t getFirstFree(uint8_t S);
 void * diviser(uint8_t S, uint8_t Slibre);
+int fusionner(uint64_t *ptr, uint64_t *buddy, uint8_t indice);
 /**Variables nécessaires*/
 void *zone_memoire = 0;
 
@@ -88,7 +96,33 @@ mem_alloc(unsigned long size)
 int
 mem_free(void *ptr, unsigned long size)
 {
+  // Erreur: libération non autorisée
+  if (!(EST_DANS_ZONE_MEM(ptr))) {
+    perror("Mem_free: La zone à libérer n'appartient pas à la zone mémoire initialement allouée");
+    return -1;
+  }
+  // Dépassement de la zone mémoire
+  if (size > ALLOC_MEM_SIZE ) {
+    perror("Mem_free: La zone à libérer est plus grande que la zone mémoire initialement allouée");
+    return -1;
+  }
+  
+  // Taille minimale à respecter pour un mem_free
+  if (size < sizeof(uint64_t *)) 
+    size = sizeof(uint64_t*);
+  
+  //Taille maximale
+  if (size == ALLOC_MEM_SIZE) {
+    TZL[BUDDY_MAX_INDEX] = (uint64_t *) ptr;
     return 0;
+  }
+  
+  //Récupération de l'adresse du budy:
+  uint64_t buddy = ADRESSE_BUDY(ptr, getIndex(size));
+  
+  if (fusionner((uint64 *) ptr,(uint64 *) buddy, getIndex(size)) == -1) {
+    perror("Mem_free: "
+  return 0;
 }
 
 
@@ -152,4 +186,7 @@ void * diviser(uint8_t S, uint8_t Slibre){
 }
 
 
-
+int fusionner(uint64_t *ptr, uint64_t *buddy, uint8_t indice) {
+  //Cas d'arrêt de la récursion : l'indice est trop grand
+  if (indice == BUDDY_MAX_INDEX || buddy == 0) {
+    return -1;
