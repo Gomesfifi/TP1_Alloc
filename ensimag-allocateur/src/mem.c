@@ -14,22 +14,6 @@
 
 /** squelette du TP allocateur memoire */
 
-/**Maccros*/
-#define EST_DANS_ZONE_MEM(ptr) \
-  (((uint64_t) ptr) >= ((uint64_t) zone_memoire)) \
-    && ((uint64_t) ptr) < (uint64_t) ((uint64_t) zone_memoire + ALLOC_MEM_SIZE)
-
-#define ADRESSE_BUDDY(ptr, index) \
-  ((uint64_t) ptr)^((uint64_t) (1 << index)) 
-
-/**Fonctions intermédiaires*/
-uint8_t getIndex(unsigned long size);
-uint8_t getFirstFree(uint8_t S);
-void * diviser(uint8_t S, uint8_t Slibre);
-void fusionner(uint64_t *ptr, uint8_t indice);
-bool estLibre(uint64_t *buddy, uint8_t indice);
-void supprimer(uint64_t *buddy, uint8_t indice);
-
 /**Variables nécessaires*/
 void *zone_memoire = 0;
 
@@ -42,6 +26,29 @@ uint64_t* TZL[BUDDY_MAX_INDEX+1]={NULL};
 // mem_init doit avoir été effectuée pour utiliser les fonctions mem_alloc, mem_free, mem_destroy
 bool memEstInit = false;
 
+/**Maccros*/
+#define EST_DANS_ZONE_MEM(ptr) \
+  (((uint64_t) ptr) >= ((uint64_t) zone_memoire)) \
+    && ((uint64_t) ptr) < (uint64_t) ((uint64_t) zone_memoire + ALLOC_MEM_SIZE)
+
+#define ADRESSE_BUDDY(ptr, index) \
+  ((uint64_t)((((uint64_t)ptr - (uint64_t)zone_memoire)^(uint64_t)(1 << index)) + (uint64_t)zone_memoire))
+/**Fonctions intermédiaires*/
+uint8_t getIndex(unsigned long size);
+uint8_t getFirstFree(uint8_t S);
+void * diviser(uint8_t S, uint8_t Slibre);
+void fusionner(uint64_t *ptr, uint8_t indice);
+bool estLibre(uint64_t *buddy, uint8_t indice);
+void supprimer(uint64_t *buddy, uint8_t indice);
+
+void printTZL() 
+{
+  /* printf("{"); */
+  /* for (int i = 0; i < 20; i++){ */
+  /*   printf("%p, ",TZL[i]); */
+  /* }  */
+  /* printf("%p }",TZL[20]); */
+}
 
 /**Fonctions principales*/
 int
@@ -77,6 +84,9 @@ mem_alloc(unsigned long size)
     // Cas particulier de la taille 0
     if (size == 0)
         return (void*)0;
+    // Cas particulier : size < taille minimale d'un bloc
+    if (size < sizeof(uint64_t*)) 
+      size = sizeof(uint64_t*);
 
     // L'indice Si (notation énoncé)
     uint8_t S = getIndex(size);
@@ -88,16 +98,20 @@ mem_alloc(unsigned long size)
     // Recherche du premier indice contenant un bloc libre
     uint8_t Slibre = getFirstFree(S);
     // Retourne une erreur si débordement du TZL : Pas de zone libre
-    if (Slibre == (BUDDY_MAX_INDEX + 1)) {
+    if (Slibre >= (BUDDY_MAX_INDEX + 1)) {
         perror("Mem_alloc : Pas de zone libre à allouer");
         return (void *) 0;
     }
     // Fonction de découpage des blocs si nécessaire
-    return diviser(S,Slibre);
+    void* resultat = diviser(S,Slibre);
+     /* printf("\n mem_alloc(%ld => %d) = %p\n",size, S, resultat); */
+    return resultat;
 }
 
 int
 mem_free(void *ptr, unsigned long size) {
+  printTZL();
+  /* printf("\n Mem_free(%p, %ld => %d\n",ptr,size, getIndex(size)); */
     // Erreur: libération non autorisée
     if (!(EST_DANS_ZONE_MEM(ptr))) {
         perror("Mem_free: La zone à libérer n'appartient pas à la zone mémoire initialement allouée");
@@ -116,13 +130,14 @@ mem_free(void *ptr, unsigned long size) {
     //Taille maximale : Cas trivial
     if (size == ALLOC_MEM_SIZE) {
         TZL[BUDDY_MAX_INDEX] = (uint64_t *) ptr;
+	*TZL[BUDDY_MAX_INDEX] = 0;
+	printTZL();
+	/* printf("La valeur de tes morts est: %p\n", (void *)*TZL[20]); */
         return 0;
     }
-
-    //Récupération de l'adresse du budy:
-    uint64_t buddy = ADRESSE_BUDDY(ptr, getIndex(size));
+    // Fonction récursive de fusion avec les hypothétiques buddy
     fusionner((uint64_t*) ptr, getIndex(size));
-
+    printTZL();
     return 0;
 }
 
@@ -158,28 +173,30 @@ uint8_t getIndex(unsigned long size){
 
 uint8_t getFirstFree(uint8_t S){
     uint8_t res = S;
-    while (TZL[res] == (void*)0 && res < (BUDDY_MAX_INDEX + 1))
+    while (TZL[res] == 0 && res < (BUDDY_MAX_INDEX + 1))
         res++;
     return res;
 }
 
 void * diviser(uint8_t S, uint8_t Slibre){
+  printTZL();
     // Cas fixe : Slibre est le plus petit indice plus grand que S contenant un bloc libre
     // Cas d'arret de la récursion : On est arrivé à la taille voulu
     if (S == Slibre){
         void* res = (void*)TZL[S];
-        TZL[S] = (uint64_t*) *TZL[S];
+        TZL[S] = (uint64_t*)*TZL[S];
         return res;
     }
+    uint64_t * buf = TZL[Slibre-1];
     // Etape 1 : On place le bloc à l'indice précédent
     TZL[Slibre-1] = TZL[Slibre];
     // Etape 2 : On prend le bloc suivant dans l'indice actuel
-    TZL[Slibre] = (u_int64_t *)*TZL[Slibre];
+    TZL[Slibre] = (uint64_t *)*TZL[Slibre];
     // Etape 3 : Découpage en deux blocs de taille 2^{Slibre-1}
     // Etape 3.1) Le premier bloc pointe vers le second
     *TZL[Slibre-1] = (uint64_t )TZL[Slibre-1] + (uint64_t)pow(2,(Slibre-1));
     // Etape 3.2) Le second bloc ne pointe vers rien
-    *((uint64_t *)*TZL[Slibre-1]) = 0;
+    *((uint64_t *)*TZL[Slibre-1]) = (uint64_t)buf;
 
     //Appel récursif
     return diviser(S,(uint8_t)(Slibre-1));
@@ -188,8 +205,10 @@ void * diviser(uint8_t S, uint8_t Slibre){
 
 
 void fusionner(uint64_t *ptr, uint8_t indice) {
+ 
     // Etape 0 : Calcul du buddy
     uint64_t * buddy = (uint64_t *)(ADRESSE_BUDDY(ptr,indice));
+    /* printf("\n Fusionner ===> %p, %i, %p\n",ptr, indice, buddy); */
     // Etape 1 : Le buddy est-il dans la TZL[indice]
     // Cas où il n'est pas dans la TZL
     if (!estLibre(buddy,indice)){
@@ -209,13 +228,15 @@ void fusionner(uint64_t *ptr, uint8_t indice) {
 void supprimer(uint64_t *buddy, uint8_t indice) {
     uint64_t * cour = TZL[indice];
     // Cas où buddy est en tête
-    if (cour == buddy)
+    if (cour == buddy) {
         TZL[indice] = (uint64_t *)*buddy;
+	return;
+    }
     // Sinon recherche du buddy
     while ((uint64_t *)*cour != buddy)
         cour = (uint64_t *)*cour;
     // cour est le prédécesseur de buddy
-    // On supprime buddy en le sautant dans le chainage
+      // On supprime buddy en le sautant dans le chainage
     *cour = *buddy;
 }
 
